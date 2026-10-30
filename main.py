@@ -1,33 +1,32 @@
-import os
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+import config
+from handlers.command_loader import load_commands
 
-# Încarcă variabilele din fișierul .env
-load_dotenv()
+class ServerBot(commands.Bot):
+    def __init__(self):
+        intents = discord.Intents.default()
+        super().__init__(command_prefix="!", intents=intents)
 
-TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
+    async def setup_hook(self):
+        # Incarca doar fisierele specificate in lista
+        await load_commands(self, config.ACTIVE_EXTENSIONS)
 
-# Configurarea permisiunilor botului
-intents = discord.Intents.default()
-bot = commands.Bot(command_prefix="!", intents=intents)
+        if config.GUILD_ID:
+            self.tree.copy_global_to(guild=config.GUILD_ID)
+            await self.tree.sync(guild=config.GUILD_ID)
+            print(f"Slash commands successfully synced to guild {config.GUILD_ID.id}.")
+        else:
+            await self.tree.sync()
+            print("Slash commands synced globally.")
 
-@bot.event
-async def on_ready():
-    print(f"Botul este conectat ca {bot.user.name}")
-    
-    # Obține canalul pe baza ID-ului
-    channel = bot.get_channel(CHANNEL_ID)
-    
-    if channel:
-        await channel.send("Salut! Botul a pornit cu succes.")
-        print("Mesajul a fost trimis pe canal.")
-    else:
-        print("Canalul nu a fost găsit. Verifică CHANNEL_ID și dacă botul are acces la el.")
+    async def on_ready(self):
+        print(f"Bot logged in as: {self.user}")
+        await self.change_presence(activity=discord.Game(name="Minecraft Dashboard"))
 
-# Pornirea botului
+bot = ServerBot()
+
 if __name__ == "__main__":
-    if not TOKEN:
-        raise ValueError("Token-ul DISCORD_TOKEN nu este setat în fișierul .env!")
-    bot.run(TOKEN)
+    if not config.TOKEN:
+        raise ValueError("DISCORD_TOKEN nu este setat in fisierul .env!")
+    bot.run(config.TOKEN)
